@@ -1,0 +1,61 @@
+---
+title: "model 3-5"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup}
+toggle_code <- T
+```
+
+```{r}
+# load data
+attitData <- readstata13::read.dta13("master_dataset.dta", generate.factors=TRUE, nonint.factors = TRUE) 
+attit_female <- subset(attitData, ch_female == 1)
+```
+## Model 3
+
+```{r}
+fit_base <- lm(ch_Family_attit_mean ~ expo15_lnfaminc + expo15_sd_faminc + expo15_marriedworking + expo15_marriedbread + expo15_notm + Att_Index_1979 + expo15_hgc_, weights = ch_SAMPWT_1979, data = attit_female)
+model3 <- summary(fit_base)
+plot(fit_base, which = 1)
+```
+
+## Model 4
+
+```{r}
+# randomly select 2/3 of the rows in the data as the construction set
+att_female_naomit <- na.omit(attit_female)
+idx_selected <- sample(1:nrow(att_female_naomit), round(nrow(att_female_naomit)*2/3), replace = F)
+construction <- att_female_naomit[idx_selected, ]
+validation <- att_female_naomit[!1:nrow(att_female_naomit) %in% idx_selected, ]
+# fit the model on the construction set
+fit4 <- lm(ch_Family_attit_mean ~ expo15_lnfaminc + expo15_sd_faminc + expo15_marriedworking + expo15_marriedbread + expo15_notm + Att_Index_1979 + expo15_hgc_, weights = ch_SAMPWT_1979, data = construction)
+model4 <- summary(fit4)
+# predict on the validation set
+validation$fitted <- predict(fit4, validation)
+rmse <- sqrt(sum((validation$ch_Family_attit_mean - validation$fitted)^2)/nrow(validation))
+rmse
+plot(fit4, which = 1)
+```
+
+
+## Model5
+
+```{r}
+random_imp <- function(x) {
+  n_non_na <- sum(!is.na(x))
+  if (n_non_na == 0) {
+    stop("No non-NA values")
+  } else {
+    x[is.na(x)] <- sample(x[!is.na(x)], size = sum(is.na(x)), replace = TRUE)
+  }
+  x
+}
+imputed_ch_Family_attit_mean <- random_imp(attit_female$ch_Family_attit_mean)
+fit5 <- lm(data = attit_female, imputed_ch_Family_attit_mean ~ expo15_lnfaminc + expo15_sd_faminc + expo15_marriedworking + expo15_marriedbread + expo15_notm + Att_Index_1979 + expo15_hgc_, weights = ch_SAMPWT_1979)
+model5 <- summary(fit5)
+plot(fit5, which = 1)
+```
+
